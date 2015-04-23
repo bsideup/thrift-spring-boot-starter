@@ -1,0 +1,1 @@
+# thrift-spring-boot-starter
