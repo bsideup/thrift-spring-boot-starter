@@ -1,0 +1,17 @@
+machine:
+  timezone:
+    Europe/Tallinn
+  java:
+    version: oraclejdk7
+
+dependencies:
+  cache_directories:
+    - ~/.gradle
+    - ~/.ivy2
+    - ~/.m2
+  override:
+    - ./gradlew dependencies
+
+test:
+  override:
+    - ./gradlew test
