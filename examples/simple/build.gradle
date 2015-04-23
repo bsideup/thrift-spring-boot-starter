@@ -1,0 +1,5 @@
+dependencies {
+    compile project(":thrift-spring-boot-starter")
+    
+    compile 'com.kurento.kms:kms-interface:4.3.1'
+}

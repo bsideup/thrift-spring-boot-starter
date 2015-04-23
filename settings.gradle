@@ -1,0 +1,3 @@
+include 'thrift-spring-boot-starter'
+
+include 'examples:simple'
