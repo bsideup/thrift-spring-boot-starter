@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.metrics.GaugeService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.embedded.RegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -30,6 +31,7 @@ import java.lang.reflect.Constructor;
 
 @Configuration
 @ConditionalOnClass(ThriftHandler.class)
+@ConditionalOnWebApplication
 public class ThriftAutoConfiguration {
 
     public interface ThriftConfigurer {
@@ -39,27 +41,28 @@ public class ThriftAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(ThriftConfigurer.class)
     ThriftConfigurer thriftConfigurer() {
-        return new ThriftConfigurer() {
-            
-            @Autowired(required = false)
-            GaugeService gaugeService;
-            
-            public void configureProxyFactory(ProxyFactory proxyFactory) {
-                proxyFactory.setOptimize(true);
-                
-                if(gaugeService != null) {
-                    proxyFactory.addAdvice(new MetricsThriftMethodInterceptor(gaugeService));
-                }
-                
-                proxyFactory.addAdvice(new ExceptionsThriftMethodInterceptor());
-            }
-        };
+        return new DefaultThriftConfigurer();
     }
     
     @Bean
     @ConditionalOnMissingBean(TProtocolFactory.class)
     TProtocolFactory thriftProtocolFactory() {
         return new TBinaryProtocol.Factory();
+    }
+    
+    public static class DefaultThriftConfigurer implements ThriftConfigurer {
+        @Autowired(required = false)
+        GaugeService gaugeService;
+
+        public void configureProxyFactory(ProxyFactory proxyFactory) {
+            proxyFactory.setOptimize(true);
+
+            if(gaugeService != null) {
+                proxyFactory.addAdvice(new MetricsThriftMethodInterceptor(gaugeService));
+            }
+
+            proxyFactory.addAdvice(new ExceptionsThriftMethodInterceptor());
+        }
     }
 
     @Configuration
