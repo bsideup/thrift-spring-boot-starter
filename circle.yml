@@ -10,7 +10,7 @@ dependencies:
     - ~/.ivy2
     - ~/.m2
   override:
-    - ./gradlew dependencies
+    - ./gradlew resolveAllDependencies
 
 test:
   override:
