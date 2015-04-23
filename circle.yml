@@ -3,6 +3,8 @@ machine:
     Europe/Tallinn
   java:
     version: oraclejdk7
+  environment:
+    TERM: dumb
 
 dependencies:
   cache_directories:
