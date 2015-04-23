@@ -1,8 +1,47 @@
-
+apply plugin: 'maven'
+apply plugin: 'com.jfrog.bintray'
 
 dependencies {
     compile 'org.apache.thrift:libthrift'
 
     compile "org.springframework.boot:spring-boot-starter-web"
-    compile "org.springframework.boot:spring-boot-starter-actuator", optional
+    compile "org.springframework.boot:spring-boot-starter-actuator"
+}
+
+task sourceJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourceJar
+    archives javadocJar
+}
+
+bintray {
+    user = 'bsideup'
+    key = project.hasProperty('bintrayKey') ? bintrayKey : ""
+
+    configurations = ['archives']
+
+    dryRun = false
+    publish = true
+    pkg {
+        repo = 'repo'
+        name = 'thrift-spring-boot-starter'
+
+        desc = 'Spring Boot starter for Apache Thrift'
+
+        websiteUrl = 'https://github.com/bsideup/thrift-spring-boot-starter'
+        issueTrackerUrl = 'https://github.com/bsideup/thrift-spring-boot-starter/issues'
+        vcsUrl = 'https://github.com/bsideup/thrift-spring-boot-starter.git'
+
+        licenses = ['Apache-2.0']
+        labels = ['spring', 'boot', 'thrift', 'starter']
+    }
 }

@@ -10,9 +10,10 @@ buildscript {
     }
 }
 
-apply plugin: 'com.jfrog.bintray'
-
 allprojects {
+    group = 'ru.trylogic.spring.boot.thrift'
+    version = '0.0.2'
+
     repositories {
         jcenter()
     }
@@ -20,7 +21,6 @@ allprojects {
     apply plugin: 'idea'
     apply plugin: "io.spring.dependency-management"
     apply plugin: 'provided-base'
-    apply plugin: 'optional-base'
 
     dependencyManagement {
         dependencies {
@@ -41,7 +41,6 @@ allprojects {
 
 subprojects {
     apply plugin: 'java'
-    apply plugin: 'maven-publish'
 
     sourceCompatibility = 1.7
     targetCompatibility = 1.7
