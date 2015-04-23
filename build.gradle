@@ -51,6 +51,13 @@ subprojects {
 
     sourceCompatibility = 1.7
     targetCompatibility = 1.7
+
+    test {
+        reports {
+            junitXml.enabled = true
+            html.enabled = true
+        }
+    }
     
     dependencies {
         provided "org.projectlombok:lombok"
