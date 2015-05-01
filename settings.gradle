@@ -1,3 +1,5 @@
 include 'thrift-spring-boot-starter'
 
+include 'examples:protocol'
 include 'examples:simple'
+include 'examples:async'

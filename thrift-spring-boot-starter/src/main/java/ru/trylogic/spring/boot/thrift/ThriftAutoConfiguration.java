@@ -3,9 +3,11 @@ package ru.trylogic.spring.boot.thrift;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
+import org.apache.thrift.TBaseAsyncProcessor;
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
+import org.apache.thrift.server.TAsyncHttpServlet;
 import org.apache.thrift.server.TServlet;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.aop.target.SingletonTargetSource;
@@ -24,10 +26,10 @@ import ru.trylogic.spring.boot.thrift.annotation.ThriftHandler;
 import ru.trylogic.spring.boot.thrift.aop.ExceptionsThriftMethodInterceptor;
 import ru.trylogic.spring.boot.thrift.aop.MetricsThriftMethodInterceptor;
 
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
+import javax.servlet.*;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.List;
 
 @Configuration
 @ConditionalOnClass(ThriftHandler.class)
@@ -68,6 +70,14 @@ public class ThriftAutoConfiguration {
     @Configuration
     public static class Registrar extends RegistrationBean implements ApplicationContextAware {
         
+        public static String SYNC_INTERFACE_POSTFIX = "$Iface";
+        
+        public static String ASYNC_INTERFACE_POSTFIX = "$AsyncIface";
+        
+        public static String SYNC_PROCESSOR_INTERFACE_POSTFIX = "$Processor";
+        
+        public static String ASYNC_PROCESSOR_INTERFACE_POSTFIX = "$AsyncProcessor";
+        
         @Getter
         @Setter
         ApplicationContext applicationContext;
@@ -87,47 +97,48 @@ public class ThriftAutoConfiguration {
                 registerHandler(servletContext, annotation.value(), applicationContext.getBean(beanName));
             }
         }
+        
+        protected List<Class<?>> getThriftInterfaces(Object handler) {
+            Class<?>[] handlerInterfaces = handler.getClass().getInterfaces();
+            
+            List<Class<?>> result = new ArrayList<>();
+            for (Class<?> handlerInterfaceClass : handlerInterfaces) {
+                if (handlerInterfaceClass.getName().endsWith(SYNC_INTERFACE_POSTFIX) || handlerInterfaceClass.getName().endsWith(ASYNC_INTERFACE_POSTFIX)) {
+                    result.add(handlerInterfaceClass);
+                }
+            }
+            
+            return result;
+        }
+        
+        protected Class<TProcessor> getProcessorClass(Class serviceClass, boolean async) {
+            String postfix = async ? ASYNC_PROCESSOR_INTERFACE_POSTFIX : SYNC_PROCESSOR_INTERFACE_POSTFIX;
+            for (Class<?> innerClass : serviceClass.getDeclaredClasses()) {
+                if (innerClass.getName().endsWith(postfix)) {
+                    return (Class<TProcessor>) innerClass;
+                }
+            }
+            
+            return null;
+        }
 
         protected void registerHandler(ServletContext servletContext, String[] urls, Object handler) throws ClassNotFoundException, NoSuchMethodException {
-            Class<?>[] handlerInterfaces = handler.getClass().getInterfaces();
-
-            Class ifaceClass = null;
-            Class<TProcessor> processorClass = null;
-            Class serviceClass = null;
-
-            for (Class<?> handlerInterfaceClass : handlerInterfaces) {
-                if (!handlerInterfaceClass.getName().endsWith("$Iface")) {
-                    continue;
-                }
-
-                serviceClass = handlerInterfaceClass.getDeclaringClass();
-
-                if (serviceClass == null) {
-                    continue;
-                }
-
-                for (Class<?> innerClass : serviceClass.getDeclaredClasses()) {
-                    if (!innerClass.getName().endsWith("$Processor")) {
-                        continue;
-                    }
-
-                    if (!TProcessor.class.isAssignableFrom(innerClass)) {
-                        continue;
-                    }
-
-                    if (ifaceClass != null) {
-                        throw new IllegalStateException("Multiple Thrift Ifaces defined on handler");
-                    }
-
-                    ifaceClass = handlerInterfaceClass;
-                    processorClass = (Class<TProcessor>) innerClass;
-                    break;
-                }
-            }
-
-            if (ifaceClass == null) {
+            List<Class<?>> thriftInterfaces = getThriftInterfaces(handler);
+            
+            if(thriftInterfaces.size() == 0) {
                 throw new IllegalStateException("No Thrift Ifaces found on handler");
             }
+            
+            if(thriftInterfaces.size() > 1) {
+                throw new IllegalStateException("Multiple Thrift Ifaces defined on handler");
+            }
+            Class ifaceClass = thriftInterfaces.get(0);
+            
+            Class serviceClass = ifaceClass.getDeclaringClass();
+
+            boolean async = ifaceClass.getName().endsWith(ASYNC_INTERFACE_POSTFIX);
+            
+            Class<TProcessor> processorClass = getProcessorClass(serviceClass, async);
 
             handler = wrapHandler(ifaceClass, handler);
 
@@ -135,9 +146,9 @@ public class ThriftAutoConfiguration {
 
             TProcessor processor = BeanUtils.instantiateClass(processorConstructor, handler);
 
-            TServlet servlet = getServlet(processor, protocolFactory);
+            Servlet servlet = getServlet(processor, protocolFactory, async);
 
-            String servletBeanName = ifaceClass.getDeclaringClass().getSimpleName() + "Servlet";
+            String servletBeanName = ifaceClass.getDeclaringClass().getSimpleName() + (async ? "AsyncServlet" : "Servlet");
 
             ServletRegistration.Dynamic registration = servletContext.addServlet(servletBeanName, servlet);
 
@@ -146,10 +157,16 @@ public class ThriftAutoConfiguration {
             } else {
                 registration.addMapping("/" + serviceClass.getSimpleName());
             }
+
+            registration.setAsyncSupported(async);
         }
 
-        protected TServlet getServlet(TProcessor processor, TProtocolFactory protocolFactory) {
-            return new TServlet(processor, protocolFactory);
+        protected Servlet getServlet(final TProcessor processor, final TProtocolFactory protocolFactory, boolean async) {
+            if(!async) {
+                return new TServlet(processor, protocolFactory);
+            }
+
+            return new TAsyncHttpServlet((TBaseAsyncProcessor<?>) processor, protocolFactory);
         }
 
         protected <T> T wrapHandler(Class<T> interfaceClass, T handler) {

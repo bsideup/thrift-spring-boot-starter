@@ -1,6 +1,8 @@
 package ru.trylogic.spring.boot.thrift.examples.simple;
 
-import com.kurento.kms.thrift.api.KmsMediaServerService;
+import example.TGreetingService;
+import example.TName;
+import example.TStatus;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 import org.apache.thrift.transport.THttpClient;
@@ -14,7 +16,6 @@ import org.springframework.boot.test.IntegrationTest;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.test.context.web.WebAppConfiguration;
-import ru.trylogic.spring.boot.thrift.examples.simple.Application;
 
 import static org.junit.Assert.assertEquals;
 
@@ -22,7 +23,7 @@ import static org.junit.Assert.assertEquals;
 @SpringApplicationConfiguration(classes = Application.class)
 @WebAppConfiguration
 @IntegrationTest("server.port:0")
-public class KmsMediaServerServiceTests {
+public class TGreetingServiceTests {
 
     @Value("${local.server.port}")
     int port;
@@ -30,21 +31,25 @@ public class KmsMediaServerServiceTests {
     @Autowired
     TProtocolFactory protocolFactory;
 
-    KmsMediaServerService.Iface client;
+    TGreetingService.Iface client;
 
     @Before
     public void setUp() throws Exception {
-        TTransport transport = new THttpClient("http://localhost:" + port + "/" + KmsMediaServerService.class.getSimpleName());
+        TTransport transport = new THttpClient("http://localhost:" + port + "/" + TGreetingService.class.getSimpleName());
 
         TProtocol protocol = protocolFactory.getProtocol(transport);
 
-        client = new KmsMediaServerService.Client(protocol);
+        client = new TGreetingService.Client(protocol);
     }
 
     @Test
     public void testSimpleCall() throws Exception {
-        String result = client.invokeJsonRpc("Hello world");
+        TName name = new TName("John", "Smith");
 
-        assertEquals("HELLO WORLD", result);
+        assertEquals("Hello John Smith", client.greet(name));
+        
+        name.setStatus(TStatus.MR);
+        
+        assertEquals("Hello Mr John Smith", client.greet(name));
     }
 }

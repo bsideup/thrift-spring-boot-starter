@@ -2,4 +2,6 @@ dependencies {
     compile project(":thrift-spring-boot-starter")
     
     compile project(":examples:protocol")
+    
+    compile "com.google.guava:guava"
 }
